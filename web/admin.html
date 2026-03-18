@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 - OJ Platform</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .filter-bar select, .filter-bar input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .submissions-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .submissions-table th, .submissions-table td {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+        .submissions-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .status-accepted { background: #d4edda; color: #155724; }
+        .status-wrong { background: #f8d7da; color: #721c24; }
+        .status-compile { background: #fff3cd; color: #856404; }
+        .status-timeout { background: #cce5ff; color: #004085; }
+        .status-pending { background: #e2e3e5; color: #383d41; }
+        .view-code-btn {
+            padding: 4px 12px;
+            background: #1890ff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .view-code-btn:hover {
+            background: #40a9ff;
+        }
+        .code-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .code-modal-content {
+            background: #fff;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            margin: 2vh auto;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .code-modal-header {
+            padding: 1rem;
+            background: #f5f5f5;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .code-modal-body {
+            padding: 1rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        .code-block {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .submission-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .info-item label {
+            font-weight: 600;
+            color: #666;
+        }
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+        }
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .pagination button.active {
+            background: #1890ff;
+            color: #fff;
+            border-color: #1890ff;
+        }
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">OJ Platform</div>
+        <div class="nav-links">
+            <a href="/problems.html">题库</a>
+            <a href="/leaderboard.html">排行榜</a>
+            <a href="/admin.html" class="active">管理</a>
+        </div>
+        <div class="nav-user">
+            <span id="username"></span>
+            <button onclick="logout()" class="btn btn-outline">退出</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="admin-header">
+            <h1>管理后台</h1>
+            <button onclick="showImportModal()" class="btn btn-primary">+ 导入题目</button>
+        </div>
+
+        <div class="filter-bar">
+            <select id="filter-status">
+                <option value="">全部状态</option>
+                <option value="Accepted">已通过</option>
+                <option value="Wrong Answer">答案错误</option>
+                <option value="Compile Error">编译错误</option>
+                <option value="Time Limit Exceeded">超时</option>
+                <option value="Runtime Error">运行错误</option>
+            </select>
+            <select id="filter-problem">
+                <option value="">全部题目</option>
+            </select>
+            <button onclick="loadSubmissions()" class="btn btn-primary">筛选</button>
+        </div>
+
+        <table class="submissions-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>用户</th>
+                    <th>题目</th>
+                    <th>状态</th>
+                    <th>执行时间</th>
+                    <th>内存</th>
+                    <th>提交时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="submissions-body"></tbody>
+        </table>
+
+        <div class="pagination" id="pagination"></div>
+    </div>
+
+    <!-- 代码查看模态框 -->
+    <div id="code-modal" class="code-modal">
+        <div class="code-modal-content">
+            <div class="code-modal-header">
+                <h3 id="modal-title">提交详情</h3>
+                <button onclick="closeModal()" style="font-size:24px;border:none;background:none;cursor:pointer;">&times;</button>
+            </div>
+            <div class="code-modal-body">
+                <div class="submission-info" id="submission-info"></div>
+                <h4>代码</h4>
+                <div class="code-block" id="code-display"></div>
+                <div id="result-display" style="margin-top:1rem;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 导入题目模态框 -->
+    <div id="import-modal" class="code-modal">
+        <div class="code-modal-content">
+            <div class="code-modal-header">
+                <h3>导入自定义题目（JSON格式）</h3>
+                <button onclick="closeImportModal()" style="font-size:24px;border:none;background:none;cursor:pointer;">&times;</button>
+            </div>
+            <div class="code-modal-body">
+                <p style="color:#666;font-size:13px;margin-bottom:0.5rem;">
+                    粘贴符合以下格式的JSON，最多支持100组测试用例：
+                </p>
+                <pre style="background:#f8f9fa;padding:0.75rem;border-radius:4px;font-size:12px;margin-bottom:1rem;">{
+  "title": "题目名称",
+  "description": "题目描述...",
+  "difficulty": "Easy",
+  "tags": "数组,哈希表",
+  "time_limit": 5000,
+  "memory_limit": 256,
+  "function_template": "func solution() {\n    // 实现代码\n}",
+  "driver_code": "package main\nimport \"fmt\"\nfunc main() { ... }",
+  "test_cases": [
+    {"input": "2 7 11 15\n9", "output": "0 1", "is_public": true},
+    {"input": "3 2 4\n6",     "output": "1 2", "is_public": false}
+  ]
+}</pre>
+                <textarea id="import-json" rows="14"
+                    style="width:100%;font-family:monospace;font-size:13px;padding:0.5rem;border:1px solid #ddd;border-radius:4px;box-sizing:border-box;resize:vertical;"
+                    placeholder="在此粘贴JSON..."></textarea>
+                <div id="import-error" style="color:#dc3545;font-size:13px;margin-top:0.5rem;display:none;"></div>
+                <div style="margin-top:1rem;text-align:right;gap:0.5rem;display:flex;justify-content:flex-end;">
+                    <button onclick="closeImportModal()" class="btn btn-outline">取消</button>
+                    <button onclick="doImport()" class="btn btn-primary">确认导入</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script>
+        if (!checkAuth()) {
+            throw new Error('Not authenticated');
+        }
+        document.getElementById('username').textContent = localStorage.getItem('username');
+
+        let currentPage = 1;
+        let totalPages = 1;
+        const pageSize = 20;
+
+        async function loadProblems() {
+            const resp = await API.getProblems(1, 100);
+            const problems = resp.data.problems || [];
+            const select = document.getElementById('filter-problem');
+            problems.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.id}. ${p.title}`;
+                select.appendChild(opt);
+            });
+        }
+
+        async function loadSubmissions(page = 1) {
+            currentPage = page;
+            const status = document.getElementById('filter-status').value;
+            const problemId = document.getElementById('filter-problem').value;
+
+            try {
+                const resp = await API.getAdminSubmissions(page, pageSize, status, problemId);
+                const data = resp.data;
+                
+                totalPages = Math.ceil(data.total / pageSize);
+
+                const tbody = document.getElementById('submissions-body');
+                tbody.innerHTML = data.submissions.map(s => {
+                    const statusClass = getStatusClass(s.status);
+                    const memoryDisplay = s.memory_used 
+                        ? (s.memory_used >= 1024 ? (s.memory_used/1024).toFixed(2)+' MB' : s.memory_used+' KB')
+                        : '-';
+                    return `
+                        <tr>
+                            <td>${s.id}</td>
+                            <td>${s.username}</td>
+                            <td>${s.problem_title}</td>
+                            <td><span class="status-badge ${statusClass}">${s.status}</span></td>
+                            <td>${s.time_used || '-'} ms</td>
+                            <td>${memoryDisplay}</td>
+                            <td>${s.created_at}</td>
+                            <td><button class="view-code-btn" onclick="viewCode(${s.id})">查看代码</button></td>
+                        </tr>
+                    `;
+                }).join('');
+
+                renderPagination();
+            } catch (e) {
+                console.error('Failed to load submissions:', e);
+            }
+        }
+
+        function getStatusClass(status) {
+            switch(status) {
+                case 'Accepted': return 'status-accepted';
+                case 'Wrong Answer': return 'status-wrong';
+                case 'Compile Error': return 'status-compile';
+                case 'Time Limit Exceeded': return 'status-timeout';
+                default: return 'status-pending';
+            }
+        }
+
+        function renderPagination() {
+            const container = document.getElementById('pagination');
+            let html = '';
+            
+            html += `<button onclick="loadSubmissions(${currentPage-1})" ${currentPage <= 1 ? 'disabled' : ''}>上一页</button>`;
+            
+            for (let i = 1; i <= totalPages && i <= 10; i++) {
+                html += `<button onclick="loadSubmissions(${i})" class="${i === currentPage ? 'active' : ''}">${i}</button>`;
+            }
+            
+            html += `<button onclick="loadSubmissions(${currentPage+1})" ${currentPage >= totalPages ? 'disabled' : ''}>下一页</button>`;
+            
+            container.innerHTML = html;
+        }
+
+        async function viewCode(id) {
+            try {
+                const resp = await API.getSubmissionCode(id);
+                const s = resp.data.submission;
+                
+                document.getElementById('modal-title').textContent = `提交 #${s.id}`;
+                document.getElementById('submission-info').innerHTML = `
+                    <div class="info-item"><label>用户：</label> ${s.username}</div>
+                    <div class="info-item"><label>题目：</label> ${s.problem_title}</div>
+                    <div class="info-item"><label>状态：</label> <span class="status-badge ${getStatusClass(s.status)}">${s.status}</span></div>
+                    <div class="info-item"><label>语言：</label> ${s.language}</div>
+                    <div class="info-item"><label>执行时间：</label> ${s.time_used || '-'} ms</div>
+                    <div class="info-item"><label>内存消耗：</label> ${s.memory_used ? (s.memory_used >= 1024 ? (s.memory_used/1024).toFixed(2)+' MB' : s.memory_used+' KB') : '-'}</div>
+                    <div class="info-item"><label>提交时间：</label> ${s.created_at}</div>
+                `;
+                document.getElementById('code-display').textContent = s.code;
+                
+                if (s.result) {
+                    document.getElementById('result-display').innerHTML = `
+                        <h4>执行结果</h4>
+                        <pre style="background:#f8f9fa;padding:1rem;border-radius:4px;white-space:pre-wrap;">${s.result}</pre>
+                    `;
+                } else {
+                    document.getElementById('result-display').innerHTML = '';
+                }
+                
+                document.getElementById('code-modal').style.display = 'block';
+            } catch (e) {
+                alert('加载失败: ' + e.message);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('code-modal').style.display = 'none';
+        }
+
+        function showImportModal() {
+            document.getElementById('import-json').value = '';
+            document.getElementById('import-error').style.display = 'none';
+            document.getElementById('import-modal').style.display = 'block';
+        }
+
+        function closeImportModal() {
+            document.getElementById('import-modal').style.display = 'none';
+        }
+
+        async function doImport() {
+            const raw = document.getElementById('import-json').value.trim();
+            const errEl = document.getElementById('import-error');
+            errEl.style.display = 'none';
+
+            let data;
+            try {
+                data = JSON.parse(raw);
+            } catch(e) {
+                errEl.textContent = 'JSON 格式错误：' + e.message;
+                errEl.style.display = 'block';
+                return;
+            }
+
+            try {
+                const resp = await API.importProblem(data);
+                const tc = resp.data.test_case_count;
+                closeImportModal();
+                alert(`导入成功！题目 ID: ${resp.data.problem.id}，共 ${tc} 组测试用例`);
+                await loadProblems();
+            } catch(e) {
+                errEl.textContent = '导入失败：' + e.message;
+                errEl.style.display = 'block';
+            }
+        }
+
+        // 点击模态框外部关闭
+        document.getElementById('code-modal').onclick = function(e) {
+            if (e.target === this) closeModal();
+        };
+        document.getElementById('import-modal').onclick = function(e) {
+            if (e.target === this) closeImportModal();
+        };
+
+        // 初始化
+        loadProblems();
+        loadSubmissions();
+    </script>
+</body>
+</html>

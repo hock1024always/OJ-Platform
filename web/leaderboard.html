@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排行榜 - OJ Platform</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .leaderboard-tabs {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .tab-btn {
+            padding: 0.5rem 1.5rem;
+            border: 1px solid #ddd;
+            background: #fff;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .tab-btn.active {
+            background: #1890ff;
+            color: #fff;
+            border-color: #1890ff;
+        }
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            text-align: left;
+        }
+        .leaderboard-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+        .rank-badge {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            line-height: 28px;
+            text-align: center;
+            border-radius: 50%;
+            font-weight: bold;
+        }
+        .rank-1 { background: #ffd700; color: #333; }
+        .rank-2 { background: #c0c0c0; color: #333; }
+        .rank-3 { background: #cd7f32; color: #fff; }
+        .rank-other { background: #f0f0f0; color: #666; }
+        .problem-select {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            min-width: 200px;
+        }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        .stats-card h3 { margin: 0 0 0.5rem 0; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .stat-item { text-align: center; }
+        .stat-value { font-size: 1.8rem; font-weight: bold; }
+        .stat-label { font-size: 0.9rem; opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand">OJ Platform</div>
+        <div class="nav-links">
+            <a href="/problems.html">题库</a>
+            <a href="/leaderboard.html" class="active">排行榜</a>
+            <a href="/admin.html">管理</a>
+        </div>
+        <div class="nav-user">
+            <span id="username"></span>
+            <button onclick="logout()" class="btn btn-outline">退出</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <h1>排行榜</h1>
+        
+        <div class="leaderboard-tabs">
+            <button class="tab-btn active" onclick="switchTab('global')">全局排行</button>
+            <button class="tab-btn" onclick="switchTab('problem')">题目排行</button>
+        </div>
+
+        <div id="global-tab">
+            <div class="stats-card">
+                <h3>平台统计</h3>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-users">-</div>
+                        <div class="stat-label">注册用户</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-problems">-</div>
+                        <div class="stat-label">题目数量</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-submissions">-</div>
+                        <div class="stat-label">总提交数</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-accepted">-</div>
+                        <div class="stat-label">通过数</div>
+                    </div>
+                </div>
+            </div>
+
+            <h3>解题排行</h3>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>用户</th>
+                        <th>解题数</th>
+                        <th>总提交</th>
+                        <th>通过率</th>
+                    </tr>
+                </thead>
+                <tbody id="global-leaderboard"></tbody>
+            </table>
+        </div>
+
+        <div id="problem-tab" style="display:none;">
+            <div style="margin-bottom: 1rem;">
+                <label>选择题目：</label>
+                <select id="problem-select" class="problem-select" onchange="loadProblemLeaderboard()">
+                    <option value="">加载中...</option>
+                </select>
+            </div>
+            <table class="leaderboard-table">
+                <thead>
+                    <tr>
+                        <th>排名</th>
+                        <th>用户</th>
+                        <th>执行时间</th>
+                        <th>内存消耗</th>
+                        <th>提交时间</th>
+                    </tr>
+                </thead>
+                <tbody id="problem-leaderboard"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script>
+        if (!checkAuth()) {
+            throw new Error('Not authenticated');
+        }
+        document.getElementById('username').textContent = localStorage.getItem('username');
+
+        let problems = [];
+
+        async function loadProblems() {
+            const resp = await API.getProblems();
+            problems = resp.data.problems || [];
+            
+            const select = document.getElementById('problem-select');
+            select.innerHTML = problems.map(p => 
+                `<option value="${p.id}">${p.id}. ${p.title}</option>`
+            ).join('');
+            
+            if (problems.length > 0) {
+                loadProblemLeaderboard();
+            }
+        }
+
+        async function loadGlobalLeaderboard() {
+            try {
+                const resp = await API.getGlobalLeaderboard();
+                const data = resp.data || [];
+                
+                // 统计数据
+                let totalUsers = data.length;
+                let totalSolved = data.reduce((sum, u) => sum + u.solved_count, 0);
+                let totalSubs = data.reduce((sum, u) => sum + (u.total_submissions || 0), 0);
+                
+                document.getElementById('total-users').textContent = totalUsers;
+                document.getElementById('total-problems').textContent = problems.length;
+                document.getElementById('total-submissions').textContent = totalSubs;
+                document.getElementById('total-accepted').textContent = totalSolved;
+
+                const tbody = document.getElementById('global-leaderboard');
+                tbody.innerHTML = data.map((u, i) => {
+                    const rankClass = i < 3 ? `rank-${i+1}` : 'rank-other';
+                    return `
+                        <tr>
+                            <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+                            <td>${u.username}</td>
+                            <td><strong>${u.solved_count}</strong></td>
+                            <td>${u.total_submissions || 0}</td>
+                            <td>${u.acceptance_rate.toFixed(1)}%</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Failed to load leaderboard:', e);
+            }
+        }
+
+        async function loadProblemLeaderboard() {
+            const problemId = document.getElementById('problem-select').value;
+            if (!problemId) return;
+
+            try {
+                const resp = await API.getProblemLeaderboard(problemId);
+                const data = resp.data.leaderboard || [];
+                
+                const tbody = document.getElementById('problem-leaderboard');
+                if (data.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:#999;">暂无提交记录</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = data.map((e, i) => {
+                    const rankClass = i < 3 ? `rank-${i+1}` : 'rank-other';
+                    const memoryKB = e.memory_used || 0;
+                    const memoryDisplay = memoryKB >= 1024 
+                        ? (memoryKB / 1024).toFixed(2) + ' MB'
+                        : memoryKB + ' KB';
+                    return `
+                        <tr>
+                            <td><span class="rank-badge ${rankClass}">${i+1}</span></td>
+                            <td>${e.username}</td>
+                            <td>${e.time_used} ms</td>
+                            <td>${memoryDisplay}</td>
+                            <td>${e.submitted_at}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (e) {
+                console.error('Failed to load problem leaderboard:', e);
+            }
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            document.getElementById('global-tab').style.display = tab === 'global' ? 'block' : 'none';
+            document.getElementById('problem-tab').style.display = tab === 'problem' ? 'block' : 'none';
+            
+            if (tab === 'problem') {
+                loadProblemLeaderboard();
+            }
+        }
+
+        // 初始化
+        loadProblems();
+        loadGlobalLeaderboard();
+    </script>
+</body>
+</html>

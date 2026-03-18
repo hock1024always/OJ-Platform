@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OJ Platform - 题目列表</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-brand">OJ Platform</div>
+        <div class="nav-links">
+            <a href="/problems.html" class="active">题库</a>
+            <a href="/leaderboard.html">排行榜</a>
+            <a href="/admin.html">管理</a>
+        </div>
+        <div class="nav-user">
+            <span id="username"></span>
+            <button onclick="logout()" class="btn btn-outline">退出</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>题目列表</h2>
+            <div class="filters">
+                <select id="difficulty-filter">
+                    <option value="">所有难度</option>
+                    <option value="Easy">简单</option>
+                    <option value="Medium">中等</option>
+                    <option value="Hard">困难</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="problems-list" class="problems-list">
+            <!-- 题目列表将通过JS动态加载 -->
+        </div>
+
+        <div class="pagination">
+            <button onclick="loadPage(currentPage - 1)" id="prev-btn">上一页</button>
+            <span id="page-info">第 1 页</span>
+            <button onclick="loadPage(currentPage + 1)" id="next-btn">下一页</button>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/problems.js"></script>
+</body>
+</html>

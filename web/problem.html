@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OJ Platform - 题目详情</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/go/go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/clike/clike.min.js"></script>
+    <style>
+        .test-console {
+            margin-top: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .test-console-header {
+            display: flex;
+            background: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+        }
+        .console-tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            color: #666;
+            border-right: 1px solid #ddd;
+            user-select: none;
+        }
+        .console-tab.active {
+            background: #fff;
+            color: #1890ff;
+            border-bottom: 2px solid #1890ff;
+            margin-bottom: -1px;
+        }
+        .console-pane {
+            display: none;
+            padding: 0.75rem;
+            background: #fff;
+        }
+        .console-pane.active {
+            display: block;
+        }
+        .console-label {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 0.4rem;
+        }
+        .console-textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 0.5rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            resize: vertical;
+            box-sizing: border-box;
+            background: #fafafa;
+        }
+        .console-output {
+            min-height: 80px;
+            padding: 0.5rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            background: #fafafa;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #333;
+        }
+        .console-output.running {
+            color: #999;
+        }
+        .console-output.error {
+            background: #fff3cd;
+            color: #856404;
+            border-color: #ffc107;
+        }
+        .console-output.success {
+            background: #f0fff4;
+            border-color: #52c41a;
+        }
+        .perf-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.4rem;
+        }
+        .perf-bar-label {
+            width: 70px;
+            font-size: 12px;
+            color: #666;
+        }
+        .perf-bar-track {
+            flex: 1;
+            background: #e9ecef;
+            border-radius: 4px;
+            height: 6px;
+            overflow: hidden;
+        }
+        .perf-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .perf-bar-value {
+            width: 80px;
+            font-size: 12px;
+            color: #333;
+            text-align: right;
+        }
+        .editor-actions {
+            margin-top: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="nav-brand">OJ Platform</div>
+        <div class="nav-links">
+            <a href="/problems.html">题库</a>
+            <a href="/leaderboard.html">排行榜</a>
+            <a href="/admin.html">管理</a>
+        </div>
+        <div class="nav-user">
+            <span id="username"></span>
+            <button onclick="logout()" class="btn btn-outline">退出</button>
+        </div>
+    </div>
+
+    <div class="container problem-detail">
+        <div class="problem-info">
+            <div class="problem-header">
+                <h2 id="problem-title"></h2>
+                <span id="problem-difficulty" class="difficulty-badge"></span>
+            </div>
+            <div class="problem-meta">
+                <span>时间限制: <strong id="time-limit"></strong>ms</span>
+                <span>内存限制: <strong id="memory-limit"></strong>MB</span>
+            </div>
+            <div class="problem-description" id="problem-description"></div>
+
+            <div class="test-cases">
+                <h3>示例</h3>
+                <div id="test-cases-list"></div>
+            </div>
+        </div>
+
+        <div class="code-editor">
+            <div class="editor-header">
+                <label>语言:</label>
+                <select id="language-select" onchange="onLanguageChange()">
+                    <option value="Go">Go</option>
+                    <option value="C">C</option>
+                    <option value="C++">C++</option>
+                    <option value="Java">Java</option>
+                </select>
+            </div>
+            <textarea id="code-input"></textarea>
+            
+            <!-- 分栏测试控制台 -->
+            <div class="test-console">
+                <div class="test-console-header">
+                    <div class="console-tab active" id="tab-input" onclick="switchConsoleTab('input')">输入</div>
+                    <div class="console-tab" id="tab-output" onclick="switchConsoleTab('output')">输出</div>
+                </div>
+                <div class="console-pane active" id="pane-input">
+                    <div class="console-label" id="input-hint">请按照题目示例格式输入测试数据</div>
+                    <textarea id="test-input" class="console-textarea" placeholder="输入测试数据..."></textarea>
+                </div>
+                <div class="console-pane" id="pane-output">
+                    <div id="console-output-box" class="console-output">点击"运行测试"查看输出结果</div>
+                    <div id="console-perf" style="margin-top: 0.75rem; display: none;">
+                        <div class="perf-bar-row">
+                            <span class="perf-bar-label">执行时间</span>
+                            <div class="perf-bar-track"><div id="perf-time-fill" class="perf-bar-fill" style="width:0%;background:#28a745;"></div></div>
+                            <span class="perf-bar-value" id="perf-time-val">-</span>
+                        </div>
+                        <div class="perf-bar-row">
+                            <span class="perf-bar-label">内存消耗</span>
+                            <div class="perf-bar-track"><div id="perf-mem-fill" class="perf-bar-fill" style="width:0%;background:#17a2b8;"></div></div>
+                            <span class="perf-bar-value" id="perf-mem-val">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="editor-actions">
+                <button onclick="runCustomTest()" class="btn btn-secondary">运行测试</button>
+                <button onclick="submitCode()" class="btn btn-primary">提交代码</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 提交结果模态框 -->
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h3 id="modal-title">提交结果</h3>
+            <div id="result-content"></div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script src="/js/auth.js"></script>
+    <script src="/js/problem-detail.js"></script>
+</body>
+</html>

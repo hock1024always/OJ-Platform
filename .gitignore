@@ -1,0 +1,28 @@
+# Binary
+server
+gen_testcases
+import_leetcode
+bin/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Logs
+*.log
+
+# Config with secrets (use config.example.yaml instead)
+# config.yaml
+
+# Temp files
+/tmp/
+
+# Go build cache
+vendor/
+
+# OS
+.DS_Store
+
+# Backup files
+*.bak
