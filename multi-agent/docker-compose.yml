@@ -1,0 +1,190 @@
+version: '3.8'
+
+services:
+  # NATS 消息队列
+  nats:
+    image: nats:2.10-alpine
+    container_name: multi-agent-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"  # 监控端口
+    command: ["-m", "8222", "-js"]  # 启用 JetStream
+    volumes:
+      - nats-data:/data
+    networks:
+      - multi-agent-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Redis (用于状态存储)
+  redis:
+    image: redis:7-alpine
+    container_name: multi-agent-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - multi-agent-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Orchestrator 总控服务
+  orchestrator:
+    build:
+      context: .
+      dockerfile: build/orchestrator.Dockerfile
+    container_name: multi-agent-orchestrator
+    ports:
+      - "8080:8080"
+    environment:
+      - NATS_URL=nats://nats:4222
+      - REDIS_URL=redis://redis:6379
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
+    depends_on:
+      nats:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - multi-agent-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Developer Agent 1
+  agent-dev-1:
+    build:
+      context: .
+      dockerfile: build/agent.Dockerfile
+    container_name: multi-agent-dev-1
+    environment:
+      - AGENT_ID=dev-1
+      - AGENT_NAME=研发工程师-1
+      - AGENT_TYPE=developer
+      - NATS_URL=nats://nats:4222
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
+    depends_on:
+      nats:
+        condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+    networks:
+      - multi-agent-net
+    volumes:
+      - workspace-dev-1:/workspace
+
+  # Developer Agent 2
+  agent-dev-2:
+    build:
+      context: .
+      dockerfile: build/agent.Dockerfile
+    container_name: multi-agent-dev-2
+    environment:
+      - AGENT_ID=dev-2
+      - AGENT_NAME=研发工程师-2
+      - AGENT_TYPE=developer
+      - NATS_URL=nats://nats:4222
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
+    depends_on:
+      nats:
+        condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+    networks:
+      - multi-agent-net
+    volumes:
+      - workspace-dev-2:/workspace
+
+  # Tester Agent
+  agent-test-1:
+    build:
+      context: .
+      dockerfile: build/agent.Dockerfile
+    container_name: multi-agent-test-1
+    environment:
+      - AGENT_ID=test-1
+      - AGENT_NAME=测试工程师-1
+      - AGENT_TYPE=tester
+      - NATS_URL=nats://nats:4222
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
+    depends_on:
+      nats:
+        condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+    networks:
+      - multi-agent-net
+    volumes:
+      - workspace-test-1:/workspace
+
+  # Architect Agent
+  agent-arch-1:
+    build:
+      context: .
+      dockerfile: build/agent.Dockerfile
+    container_name: multi-agent-arch-1
+    environment:
+      - AGENT_ID=arch-1
+      - AGENT_NAME=架构师-1
+      - AGENT_TYPE=architect
+      - NATS_URL=nats://nats:4222
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
+    depends_on:
+      nats:
+        condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+    networks:
+      - multi-agent-net
+    volumes:
+      - workspace-arch-1:/workspace
+
+  # DevOps Agent
+  agent-ops-1:
+    build:
+      context: .
+      dockerfile: build/agent.Dockerfile
+    container_name: multi-agent-ops-1
+    environment:
+      - AGENT_ID=ops-1
+      - AGENT_NAME=运维工程师-1
+      - AGENT_TYPE=devops
+      - NATS_URL=nats://nats:4222
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-deepseek}
+    depends_on:
+      nats:
+        condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+    networks:
+      - multi-agent-net
+    volumes:
+      - workspace-ops-1:/workspace
+
+volumes:
+  nats-data:
+  redis-data:
+  workspace-dev-1:
+  workspace-dev-2:
+  workspace-test-1:
+  workspace-arch-1:
+  workspace-ops-1:
+
+networks:
+  multi-agent-net:
+    driver: bridge

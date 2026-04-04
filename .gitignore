@@ -1,8 +1,6 @@
 # Binary
-server
-gen_testcases
-import_leetcode
 bin/
+server
 
 # Database
 *.db
@@ -12,17 +10,29 @@ bin/
 # Logs
 *.log
 
-# Config with secrets (use config.example.yaml instead)
-# config.yaml
+# Runtime
+server.pid
+
+# Config (use config.example.yaml as template)
+config.yaml
 
 # Temp files
 /tmp/
+*.tmp
 
-# Go build cache
+# Go
 vendor/
 
 # OS
 .DS_Store
+Thumbs.db
 
 # Backup files
 *.bak
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

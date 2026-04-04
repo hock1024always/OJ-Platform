@@ -1,33 +1,47 @@
-.PHONY: run build test clean docker-up docker-down
+.PHONY: run build test clean deploy stop restart reset status docker-up docker-down
 
-# 运行应用
+# 开发运行
 run:
 	go run cmd/server/main.go
 
 # 编译
 build:
-	go build -o bin/server cmd/server/main.go
+	@mkdir -p bin
+	CGO_ENABLED=1 go build -o bin/server ./cmd/server/
 
 # 测试
 test:
 	go test -v ./...
 
-# 清理
+# 清理编译产物
 clean:
 	rm -rf bin/
 
-# Docker启动
+# 一键部署
+deploy:
+	./deploy.sh
+
+# 停止服务
+stop:
+	./deploy.sh stop
+
+# 重启服务
+restart:
+	./deploy.sh restart
+
+# 重置数据库
+reset:
+	./deploy.sh reset
+
+# 查看状态
+status:
+	./deploy.sh status
+
+# Docker 构建和启动
 docker-up:
-	docker-compose up -d
+	docker build -t oj-platform:latest -f tools/docker/Dockerfile .
+	docker-compose -f tools/docker/docker-compose.yml up -d
 
-# Docker停止
+# Docker 停止
 docker-down:
-	docker-compose down
-
-# 数据库迁移
-migrate:
-	go run cmd/server/main.go migrate
-
-# 查看日志
-logs:
-	docker-compose logs -f app
+	docker-compose -f tools/docker/docker-compose.yml down

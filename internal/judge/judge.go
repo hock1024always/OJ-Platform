@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -129,6 +130,9 @@ func (j *Judge) compileGo(code, driverCode string) (*CompiledProgram, *JudgeResu
 		}
 	}
 
+	// 自动补充用户代码中使用但 import 块中缺失的标准库包
+	finalCode = autoFixGoImports(finalCode)
+
 	codeFile := filepath.Join(tmpDir, "main.go")
 	if err := os.WriteFile(codeFile, []byte(finalCode), 0644); err != nil {
 		os.RemoveAll(tmpDir)
@@ -231,10 +235,11 @@ func (j *Judge) runBinary(binaryFile, input, expectedOutput, tmpDir string) *Jud
 	//   -f 16384  : 最大写文件 8 MB（512-byte blocks）防止磁盘炸弹
 	//   -u 64     : 最大子进程数 64，防止 fork 炸弹
 	//   -n 32     : 最大文件描述符，限制网络连接
-	memLimitKB := j.memoryLimit * 1024
+	// 注意：不使用 ulimit -v 限制虚拟内存，因为 Go/Java 运行时启动时需要预留大量虚拟地址空间
+	// 内存限制改为通过 /usr/bin/time -v 的 Maximum RSS 事后检查
 	sandboxCmd := fmt.Sprintf(
-		"ulimit -f 16384 -u 64 -n 32 -v %d 2>/dev/null; exec /usr/bin/time -v -o %s %s",
-		memLimitKB, timeOutputFile, binaryFile,
+		"ulimit -f 16384 -u 64 -n 32 2>/dev/null; exec /usr/bin/time -v -o %s %s",
+		timeOutputFile, binaryFile,
 	)
 	runCmd := exec.Command("/bin/bash", "-c", sandboxCmd)
 	runCmd.Stdin = strings.NewReader(input)
@@ -269,6 +274,12 @@ func (j *Judge) runBinary(binaryFile, input, expectedOutput, tmpDir string) *Jud
 	timeUsed := usage.CPUTimeMs
 	memoryUsed := usage.MemoryKB
 
+	// 内存超限检查（基于实际 RSS）
+	memoryLimitKB := j.memoryLimit * 1024
+	if memoryUsed > memoryLimitKB {
+		return &JudgeResult{Status: "Memory Limit Exceeded", TimeUsed: timeUsed, MemoryUsed: memoryUsed}
+	}
+
 	if runErr != nil {
 		// 超时检测：墙钟时间超过限制视为超时
 		if strings.Contains(runErr.Error(), "signal:") || wallTimeMs >= j.timeLimit {
@@ -291,10 +302,9 @@ func (j *Judge) runBinary(binaryFile, input, expectedOutput, tmpDir string) *Jud
 func (j *Judge) runJavaCompiled(classDir, input, expectedOutput, tmpDir string) *JudgeResult {
 	timeOutputFile := filepath.Join(tmpDir, "time_output.txt")
 
-	memLimitKB := j.memoryLimit * 1024
 	sandboxCmd := fmt.Sprintf(
-		"ulimit -f 16384 -u 64 -n 64 -v %d 2>/dev/null; exec /usr/bin/time -v -o %s %s -cp %s -Xmx%dm Main",
-		memLimitKB, timeOutputFile, j.javaPath, classDir, j.memoryLimit,
+		"ulimit -f 16384 -u 64 -n 64 2>/dev/null; exec /usr/bin/time -v -o %s %s -cp %s -Xmx%dm Main",
+		timeOutputFile, j.javaPath, classDir, j.memoryLimit,
 	)
 	runCmd := exec.Command("/bin/bash", "-c", sandboxCmd)
 	runCmd.Stdin = strings.NewReader(input)
@@ -325,6 +335,12 @@ func (j *Judge) runJavaCompiled(classDir, input, expectedOutput, tmpDir string) 
 	usage := parseResourceUsage(timeOutputFile)
 	timeUsed := usage.CPUTimeMs
 	memoryUsed := usage.MemoryKB
+
+	// 内存超限检查（基于实际 RSS）
+	memoryLimitKB := j.memoryLimit * 1024
+	if memoryUsed > memoryLimitKB {
+		return &JudgeResult{Status: "Memory Limit Exceeded", TimeUsed: timeUsed, MemoryUsed: memoryUsed}
+	}
 
 	if runErr != nil {
 		// 超时检测：墙钟时间超过限制视为超时
@@ -430,6 +446,75 @@ func parseResourceUsage(filename string) ResourceUsage {
 		CPUTimeMs:  cpuTimeMs,
 		MemoryKB:   memoryKB,
 	}
+}
+
+// autoFixGoImports 扫描代码中使用的标准库包，自动补充到 import 块中
+func autoFixGoImports(code string) string {
+	// 常见标准库包及其使用特征（包名.函数/类型）
+	stdPkgs := map[string]*regexp.Regexp{
+		"fmt":            regexp.MustCompile(`\bfmt\.`),
+		"strconv":        regexp.MustCompile(`\bstrconv\.`),
+		"strings":        regexp.MustCompile(`\bstrings\.`),
+		"sort":           regexp.MustCompile(`\bsort\.`),
+		"math":           regexp.MustCompile(`\bmath\.`),
+		"math/big":       regexp.MustCompile(`\bbig\.`),
+		"math/bits":      regexp.MustCompile(`\bbits\.`),
+		"math/rand":      regexp.MustCompile(`\brand\.`),
+		"bufio":          regexp.MustCompile(`\bbufio\.`),
+		"bytes":          regexp.MustCompile(`\bbytes\.`),
+		"os":             regexp.MustCompile(`\bos\.`),
+		"io":             regexp.MustCompile(`\bio\.`),
+		"errors":         regexp.MustCompile(`\berrors\.`),
+		"regexp":         regexp.MustCompile(`\bregexp\.`),
+		"sync":           regexp.MustCompile(`\bsync\.`),
+		"unicode":        regexp.MustCompile(`\bunicode\.`),
+		"unicode/utf8":   regexp.MustCompile(`\butf8\.`),
+		"container/heap": regexp.MustCompile(`\bheap\.`),
+		"container/list": regexp.MustCompile(`\blist\.`),
+	}
+
+	// 找出 import 块中已有的包
+	existingImports := make(map[string]bool)
+	importRe := regexp.MustCompile(`"([^"]+)"`)
+	// 找 import 区域
+	importStart := strings.Index(code, "import (")
+	importEnd := -1
+	if importStart >= 0 {
+		importEnd = strings.Index(code[importStart:], "\n)")
+		if importEnd >= 0 {
+			importEnd += importStart
+			importBlock := code[importStart : importEnd+2]
+			for _, m := range importRe.FindAllStringSubmatch(importBlock, -1) {
+				existingImports[m[1]] = true
+			}
+		}
+	}
+
+	if importEnd < 0 {
+		return code // 没有 import 块，不处理
+	}
+
+	// 扫描代码体（import 块之后的部分）中使用了哪些包
+	codeBody := code[importEnd+2:]
+	var missing []string
+	for pkg, re := range stdPkgs {
+		if !existingImports[pkg] && re.MatchString(codeBody) {
+			missing = append(missing, pkg)
+		}
+	}
+
+	if len(missing) == 0 {
+		return code
+	}
+
+	// 在 import 块的 ) 前插入缺失的包
+	insertPoint := importEnd + 1 // "\n)" 的 ")" 位置
+	var additions string
+	for _, pkg := range missing {
+		additions += fmt.Sprintf("\t\"%s\"\n", pkg)
+	}
+
+	return code[:insertPoint] + additions + code[insertPoint:]
 }
 
 // findImportEnd 找到 import 块结束位置

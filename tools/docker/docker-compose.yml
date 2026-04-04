@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: ../..
+      dockerfile: tools/docker/Dockerfile
+    container_name: oj_platform
+    ports:
+      - "8080:8080"
+    volumes:
+      - oj_data:/app
+    restart: unless-stopped
+
+volumes:
+  oj_data:

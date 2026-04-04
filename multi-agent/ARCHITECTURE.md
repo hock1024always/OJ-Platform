@@ -1,0 +1,254 @@
+# 多智能体协作平台架构设计
+
+## 核心概念
+
+### 1. 公司隐喻 (Company Metaphor)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      AI 公司 (AI Company)                    │
+├─────────────────────────────────────────────────────────────┤
+│  CEO (总控 Orchestrator)                                     │
+│   - 任务分解与分配                                            │
+│   - 协调各 Agent 协作                                         │
+│   - 监控整体进度                                              │
+├─────────────────────────────────────────────────────────────┤
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
+│  │ 研发部    │  │ 测试部    │  │ 运维部    │  │ 产品部    │   │
+│  │ DevAgent │  │TestAgent │  │OpsAgent  │  │ProdAgent │   │
+│  │ [Pod]    │  │ [Pod]    │  │ [Pod]    │  │ [Pod]    │   │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2. 技术架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     可视化工作区 (Web UI)                     │
+│  - 自然语言输入框                                             │
+│  - Agent 状态看板                                             │
+│  - 实时协作流程图                                             │
+│  - MCP Skill 工具箱                                           │
+├─────────────────────────────────────────────────────────────┤
+│                    API Gateway (Go)                          │
+│  - 认证授权                                                   │
+│  - 请求路由                                                   │
+│  - 限流熔断                                                   │
+├─────────────────────────────────────────────────────────────┤
+│              Orchestrator 总控 (Go + K8s Client)              │
+│  - 任务解析 (NLP)                                             │
+│  - Agent 调度                                                 │
+│  - 状态管理 (ETCD/Redis)                                      │
+│  - 消息总线                                                   │
+├─────────────────────────────────────────────────────────────┤
+│              Kubernetes 集群 (单机/多机)                       │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │
+│  │ Namespace   │  │ Namespace   │  │ Namespace   │         │
+│  │  agent-dev  │  │ agent-test  │  │ agent-ops   │         │
+│  │  ┌───────┐  │  │  ┌───────┐  │  │  ┌───────┐  │         │
+│  │  │  Pod  │  │  │  │  Pod  │  │  │  │  Pod  │  │         │
+│  │  │Agent  │  │  │  │Agent  │  │  │  │Agent  │  │         │
+│  │  └───────┘  │  │  └───────┘  │  │  └───────┘  │         │
+│  │  Resource   │  │  Resource   │  │  Resource   │         │
+│  │  Quota      │  │  Quota      │  │  Quota      │         │
+│  └─────────────┘  └─────────────┘  └─────────────┘         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 3. Agent 类型定义
+
+```yaml
+# agent-types.yaml
+agentTypes:
+  - name: developer
+    displayName: "研发工程师"
+    image: "ai-agent:dev-v1.0"
+    resources:
+      cpu: "2"
+      memory: "4Gi"
+      gpu: "1"  # 可选
+    skills:
+      - code_generation
+      - code_review
+      - debug
+    env:
+      - name: AGENT_ROLE
+        value: "developer"
+
+  - name: tester
+    displayName: "测试工程师"
+    image: "ai-agent:test-v1.0"
+    resources:
+      cpu: "1"
+      memory: "2Gi"
+    skills:
+      - test_case_generation
+      - automated_testing
+      - bug_report
+
+  - name: architect
+    displayName: "架构师"
+    image: "ai-agent:arch-v1.0"
+    resources:
+      cpu: "1"
+      memory: "2Gi"
+    skills:
+      - system_design
+      - tech_selection
+      - review
+
+  - name: devops
+    displayName: "运维工程师"
+    image: "ai-agent:ops-v1.0"
+    resources:
+      cpu: "1"
+      memory: "2Gi"
+    skills:
+      - deploy
+      - monitor
+      - troubleshoot
+```
+
+### 4. 协作流程
+
+```
+用户输入: "帮我开发一个电商订单系统"
+
+                    │
+                    ▼
+        ┌───────────────────────┐
+        │   Orchestrator 解析    │
+        │  - 意图识别             │
+        │  - 任务分解             │
+        └───────────────────────┘
+                    │
+        ┌───────────┼───────────┐
+        ▼           ▼           ▼
+   ┌─────────┐ ┌─────────┐ ┌─────────┐
+   │Architect│ │Developer│ │ Tester  │
+   │ 架构设计  │ │ 代码开发  │ │ 测试验证  │
+   │ [Pod]   │ │ [Pod]   │ │ [Pod]   │
+   └────┬────┘ └────┬────┘ └────┬────┘
+        │           │           │
+        └───────────┼───────────┘
+                    ▼
+        ┌───────────────────────┐
+        │   结果汇总/交付         │
+        └───────────────────────┘
+```
+
+### 5. MCP Skill 工具集成
+
+```go
+// Skill 定义
+type Skill struct {
+    Name        string            `json:"name"`
+    Description string            `json:"description"`
+    InputSchema map[string]interface{} `json:"input_schema"`
+    Handler     SkillHandler      `json:"-"`
+}
+
+// 内置 Skills
+var BuiltInSkills = []Skill{
+    {
+        Name:        "code_search",
+        Description: "在代码库中搜索相关代码",
+        InputSchema: map[string]interface{}{
+            "query": "string",
+            "language": "string",
+        },
+    },
+    {
+        Name:        "api_call",
+        Description: "调用外部 API",
+        InputSchema: map[string]interface{}{
+            "url": "string",
+            "method": "string",
+            "body": "object",
+        },
+    },
+    {
+        Name:        "db_query",
+        Description: "执行数据库查询",
+        InputSchema: map[string]interface{}{
+            "sql": "string",
+        },
+    },
+    {
+        Name:        "file_operation",
+        Description: "文件读写操作",
+        InputSchema: map[string]interface{}{
+            "action": "string", // read/write/delete
+            "path": "string",
+            "content": "string",
+        },
+    },
+}
+```
+
+### 6. 通信协议
+
+```go
+// Agent 间消息
+type AgentMessage struct {
+    MessageID   string                 `json:"message_id"`
+    From        string                 `json:"from"`        // Agent ID
+    To          string                 `json:"to"`          // Agent ID 或 broadcast
+    Type        MessageType            `json:"type"`        // task/request/response/event
+    TaskID      string                 `json:"task_id"`     // 关联任务
+    Content     map[string]interface{} `json:"content"`
+    Timestamp   int64                  `json:"timestamp"`
+}
+
+type MessageType string
+
+const (
+    MessageTypeTask     MessageType = "task"     // 分配任务
+    MessageTypeRequest  MessageType = "request"  // 请求协助
+    MessageTypeResponse MessageType = "response" // 响应
+    MessageTypeEvent    MessageType = "event"    // 状态事件
+    MessageTypeResult   MessageType = "result"   // 最终结果
+)
+```
+
+## 目录结构
+
+```
+multi-agent/
+├── cmd/
+│   ├── orchestrator/      # 总控服务
+│   ├── agent-runtime/     # Agent 运行时
+│   └── web/               # 可视化前端
+├── pkg/
+│   ├── k8s/               # K8s 操作封装
+│   ├── agent/             # Agent 管理
+│   ├── skill/             # Skill 系统
+│   ├── message/           # 消息总线
+│   └── nlp/               # 自然语言处理
+├── deploy/
+│   ├── k8s/               # K8s 部署文件
+│   │   ├── namespace.yaml
+│   │   ├── orchestrator.yaml
+│   │   └── agent-template.yaml
+│   └── helm/              # Helm Chart
+├── web/
+│   ├── src/               # 前端代码 (React/Vue)
+│   └── public/
+├── configs/
+│   ├── agent-types.yaml   # Agent 类型定义
+│   └── skills.yaml        # Skill 配置
+└── docs/
+    └── api.md             # API 文档
+```
+
+## 技术栈
+
+| 组件 | 技术 |
+|------|------|
+| 总控服务 | Go + Gin |
+| K8s 操作 | client-go |
+| 消息总线 | NATS / Redis PubSub |
+| 状态存储 | ETCD / Redis |
+| 前端 | React + TypeScript + WebSocket |
+| LLM 接口 | OpenAI / Claude / DeepSeek |
+| 监控 | Prometheus + Grafana |

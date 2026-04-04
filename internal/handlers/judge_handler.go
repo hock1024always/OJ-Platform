@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -93,9 +94,25 @@ func (h *JudgeHandler) GetProblem(c *gin.Context) {
 		testCases = []models.TestCase{}
 	}
 
+	// 解析多语言模板
+	var templates map[string]map[string]string
+	if problem.TemplatesJSON != "" {
+		json.Unmarshal([]byte(problem.TemplatesJSON), &templates)
+	}
+	if templates == nil {
+		templates = make(map[string]map[string]string)
+	}
+	// 确保有 Go 模板
+	if _, ok := templates["Go"]; !ok {
+		templates["Go"] = map[string]string{
+			"function_template": problem.FunctionTemplate,
+		}
+	}
+
 	response.Success(c, gin.H{
 		"problem":   problem,
 		"testCases": testCases,
+		"templates": templates,
 	})
 }
 

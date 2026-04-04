@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Corp - Pixel Office</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部状态栏 -->
+    <header id="topbar">
+      <div class="logo">AI Corp.</div>
+      <div class="status-bar">
+        <span id="connection-dot" class="dot offline"></span>
+        <span id="connection-text">OFFLINE</span>
+        <span class="separator">|</span>
+        <span>Agents: <span id="agent-count">0</span></span>
+        <span class="separator">|</span>
+        <span>Tasks: <span id="task-count">0</span></span>
+      </div>
+      <div class="clock" id="clock">00:00:00</div>
+    </header>
+
+    <!-- 主体 -->
+    <div id="main">
+      <!-- 左侧：办公室地图 -->
+      <div id="office">
+        <div class="panel-title">OFFICE MAP</div>
+        <div id="office-grid">
+          <!-- 工位由 JS 动态生成 -->
+        </div>
+        <div class="office-actions">
+          <button class="pixel-btn" onclick="addWorkstation()">+ ADD DESK</button>
+        </div>
+      </div>
+
+      <!-- 中间：工作区 -->
+      <div id="workspace">
+        <!-- 任务看板 -->
+        <div id="taskboard">
+          <div class="panel-title">TASK BOARD</div>
+          <div class="board-columns">
+            <div class="board-col" id="col-pending">
+              <div class="col-header pending">BACKLOG</div>
+              <div class="col-body" id="tasks-pending"></div>
+            </div>
+            <div class="board-col" id="col-running">
+              <div class="col-header running">IN PROGRESS</div>
+              <div class="col-body" id="tasks-running"></div>
+            </div>
+            <div class="board-col" id="col-completed">
+              <div class="col-header completed">DONE</div>
+              <div class="col-body" id="tasks-completed"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 对话区 -->
+        <div id="chatbox">
+          <div class="panel-title">TERMINAL</div>
+          <div id="chat-messages">
+            <div class="sys-msg">[SYSTEM] Welcome to AI Corp. Type a command or describe a task.</div>
+          </div>
+          <div id="chat-input-area">
+            <span class="prompt">&gt;</span>
+            <input type="text" id="chat-input" placeholder="Describe your task..." autocomplete="off">
+            <button class="pixel-btn send-btn" onclick="sendMessage()">SEND</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧：面板 -->
+      <div id="sidebar">
+        <!-- Agent 详情 -->
+        <div id="agent-detail" class="side-panel">
+          <div class="panel-title">AGENT INFO</div>
+          <div id="agent-detail-content">
+            <div class="empty-hint">Click a desk to see details</div>
+          </div>
+        </div>
+
+        <!-- MCP 工具 -->
+        <div id="tools-panel" class="side-panel">
+          <div class="panel-title">MCP TOOLS</div>
+          <div id="tools-list">
+            <div class="tool-item" data-tool="code_generation"><span class="tool-icon">GEN</span> Code Gen</div>
+            <div class="tool-item" data-tool="code_review"><span class="tool-icon">REV</span> Code Review</div>
+            <div class="tool-item" data-tool="test_generation"><span class="tool-icon">TST</span> Test Gen</div>
+            <div class="tool-item" data-tool="debug"><span class="tool-icon">DBG</span> Debug</div>
+            <div class="tool-item" data-tool="system_design"><span class="tool-icon">ARC</span> Sys Design</div>
+            <div class="tool-item" data-tool="deploy"><span class="tool-icon">DPL</span> Deploy</div>
+            <div class="tool-item" data-tool="search_similar_problems"><span class="tool-icon">RAG</span> RAG Search</div>
+            <div class="tool-item" data-tool="get_hint"><span class="tool-icon">HNT</span> Get Hint</div>
+          </div>
+        </div>
+
+        <!-- 系统监控 -->
+        <div id="monitor-panel" class="side-panel">
+          <div class="panel-title">SYSTEM MONITOR</div>
+          <div class="monitor-row"><span>CPU</span><div class="bar"><div class="bar-fill" id="cpu-bar" style="width:12%"></div></div><span id="cpu-val">12%</span></div>
+          <div class="monitor-row"><span>MEM</span><div class="bar"><div class="bar-fill" id="mem-bar" style="width:34%"></div></div><span id="mem-val">34%</span></div>
+          <div class="monitor-row"><span>NET</span><div class="bar"><div class="bar-fill" id="net-bar" style="width:5%"></div></div><span id="net-val">5kb/s</span></div>
+          <div class="monitor-row"><span>TOK</span><div class="bar"><div class="bar-fill" id="tok-bar" style="width:0%"></div></div><span id="tok-val">0/s</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 创建 Agent 弹窗 -->
+    <div id="modal-overlay" class="hidden">
+      <div id="modal" class="pixel-border">
+        <div class="modal-title">CREATE AGENT</div>
+        <div class="modal-body">
+          <label>NAME:</label>
+          <input type="text" id="modal-name" class="pixel-input" placeholder="Agent name">
+
+          <label>ROLE:</label>
+          <div class="role-grid">
+            <div class="role-card selected" data-role="developer" onclick="selectRole(this)">
+              <div class="role-sprite dev-sprite"></div>
+              <div>DEV</div>
+            </div>
+            <div class="role-card" data-role="tester" onclick="selectRole(this)">
+              <div class="role-sprite test-sprite"></div>
+              <div>TEST</div>
+            </div>
+            <div class="role-card" data-role="architect" onclick="selectRole(this)">
+              <div class="role-sprite arch-sprite"></div>
+              <div>ARCH</div>
+            </div>
+            <div class="role-card" data-role="devops" onclick="selectRole(this)">
+              <div class="role-sprite ops-sprite"></div>
+              <div>OPS</div>
+            </div>
+          </div>
+
+          <label>MODEL:</label>
+          <div class="model-grid">
+            <div class="model-card selected" data-model="deepseek" onclick="selectModel(this)">DeepSeek</div>
+            <div class="model-card" data-model="gpt-4" onclick="selectModel(this)">GPT-4</div>
+            <div class="model-card" data-model="claude" onclick="selectModel(this)">Claude</div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="pixel-btn cancel-btn" onclick="closeModal()">CANCEL</button>
+          <button class="pixel-btn confirm-btn" onclick="confirmCreate()">CREATE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -6,7 +6,7 @@ import (
 	"github.com/your-org/oj-platform/internal/middleware"
 )
 
-func Setup(r *gin.Engine, judgeHandler *handlers.JudgeHandler, userHandler *handlers.UserHandler, leaderboardHandler *handlers.LeaderboardHandler) {
+func Setup(r *gin.Engine, judgeHandler *handlers.JudgeHandler, userHandler *handlers.UserHandler, leaderboardHandler *handlers.LeaderboardHandler, problemAdminHandler *handlers.ProblemAdminHandler) {
 	// 全局CORS中间件
 	r.Use(middleware.CORS())
 
@@ -41,8 +41,31 @@ func Setup(r *gin.Engine, judgeHandler *handlers.JudgeHandler, userHandler *hand
 		v1.GET("/leaderboard", leaderboardHandler.GetGlobalLeaderboard)
 		v1.GET("/problems/:id/leaderboard", leaderboardHandler.GetProblemLeaderboard)
 
-		// 管理员功能
-		v1.GET("/admin/submissions", middleware.AuthRequired(), leaderboardHandler.GetAllSubmissions)
-		v1.GET("/admin/submissions/:id", middleware.AuthRequired(), leaderboardHandler.GetSubmissionCode)
+		// 管理员功能（需要认证）
+		admin := v1.Group("/admin", middleware.AuthRequired())
+		{
+			admin.GET("/submissions", leaderboardHandler.GetAllSubmissions)
+			admin.GET("/submissions/:id", leaderboardHandler.GetSubmissionCode)
+
+			// 代码生成预览
+			admin.POST("/codegen/preview", problemAdminHandler.GenerateCode)
+
+			// 题目 CRUD
+			admin.POST("/problems", problemAdminHandler.CreateProblemFull)
+			admin.PUT("/problems/:id", problemAdminHandler.UpdateProblem)
+			admin.DELETE("/problems/:id", problemAdminHandler.DeleteProblem)
+			admin.PUT("/problems/:id/status", problemAdminHandler.ToggleProblemStatus)
+			admin.GET("/problems/:id/templates", problemAdminHandler.GetProblemTemplates)
+
+			// 测试用例管理
+			admin.GET("/problems/:id/testcases", problemAdminHandler.ListTestCases)
+			admin.POST("/problems/:id/testcases", problemAdminHandler.AddTestCase)
+			admin.PUT("/testcases/:tc_id", problemAdminHandler.UpdateTestCase)
+			admin.DELETE("/testcases/:tc_id", problemAdminHandler.DeleteTestCase)
+
+			// 标程自动生成 & 验证测试用例
+			admin.POST("/problems/:id/generate-testcases", problemAdminHandler.GenerateTestCases)
+			admin.POST("/problems/:id/validate-testcases", problemAdminHandler.ValidateTestCases)
+		}
 	}
 }

@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OJ Platform - 出题管理</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .create-container { max-width: 1100px; margin: 20px auto; padding: 0 20px; }
+        .steps { display: flex; gap: 0; margin-bottom: 30px; border-bottom: 2px solid #e0e0e0; }
+        .step { flex: 1; text-align: center; padding: 12px 8px; cursor: pointer; font-weight: 500; color: #999; position: relative; transition: color 0.2s; }
+        .step.active { color: #4a90d9; }
+        .step.active::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0; height: 2px; background: #4a90d9; }
+        .step.completed { color: #27ae60; }
+        .step-num { display: inline-block; width: 24px; height: 24px; border-radius: 50%; background: #e0e0e0; color: #fff; font-size: 13px; line-height: 24px; margin-right: 6px; }
+        .step.active .step-num { background: #4a90d9; }
+        .step.completed .step-num { background: #27ae60; }
+        .step-panel { display: none; }
+        .step-panel.active { display: block; }
+        .form-row { display: flex; gap: 16px; margin-bottom: 16px; }
+        .form-row > .form-group { flex: 1; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; font-weight: 500; margin-bottom: 6px; color: #333; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+        .form-group textarea { min-height: 120px; font-family: monospace; resize: vertical; }
+        .form-group textarea.code-area { min-height: 200px; background: #f8f9fa; }
+        .btn-row { display: flex; justify-content: space-between; margin-top: 20px; }
+        .btn { padding: 10px 24px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: background 0.2s; }
+        .btn-primary { background: #4a90d9; color: #fff; }
+        .btn-primary:hover { background: #357abd; }
+        .btn-secondary { background: #e0e0e0; color: #333; }
+        .btn-secondary:hover { background: #ccc; }
+        .btn-success { background: #27ae60; color: #fff; }
+        .btn-success:hover { background: #219a52; }
+        .btn-danger { background: #e74c3c; color: #fff; }
+        .btn-danger:hover { background: #c0392b; }
+        .btn-sm { padding: 5px 14px; font-size: 13px; }
+        /* 指南样式 */
+        .guide-box { background: #fffbeb; border: 1px solid #f0d78c; border-radius: 8px; padding: 16px; margin-bottom: 20px; font-size: 13.5px; line-height: 1.7; color: #5c4813; }
+        .guide-box h4 { margin: 0 0 8px 0; color: #92700c; font-size: 14px; }
+        .guide-box code { background: #fff3cd; padding: 1px 5px; border-radius: 3px; font-family: monospace; font-size: 13px; }
+        .guide-box .example-block { background: #fff; border: 1px solid #eee; border-radius: 6px; padding: 10px 14px; margin: 8px 0; font-family: monospace; font-size: 13px; white-space: pre-wrap; color: #333; line-height: 1.5; }
+        .guide-box ul { margin: 6px 0; padding-left: 20px; }
+        .guide-box li { margin-bottom: 4px; }
+        .guide-toggle { background: none; border: none; color: #92700c; cursor: pointer; font-size: 13px; text-decoration: underline; padding: 0; }
+        .guide-detail { display: none; margin-top: 10px; }
+        .guide-detail.show { display: block; }
+        /* 函数签名构建器 */
+        .sig-builder { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; }
+        .param-list { margin: 10px 0; }
+        .param-item { display: flex; gap: 10px; align-items: center; margin-bottom: 8px; }
+        .param-item input, .param-item select { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; }
+        .param-item .param-name { width: 140px; }
+        .param-item .param-type { width: 160px; }
+        .remove-param { background: #e74c3c; color: #fff; border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 16px; line-height: 1; }
+        .add-param-btn { background: #4a90d9; color: #fff; border: none; border-radius: 4px; padding: 6px 14px; cursor: pointer; font-size: 13px; margin-top: 6px; }
+        .code-preview { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 13px; white-space: pre-wrap; overflow-x: auto; max-height: 300px; overflow-y: auto; margin-top: 10px; }
+        .lang-tabs { display: flex; gap: 0; margin-top: 16px; }
+        .lang-tab { padding: 8px 16px; background: #e0e0e0; border: none; cursor: pointer; font-size: 13px; }
+        .lang-tab:first-child { border-radius: 6px 0 0 6px; }
+        .lang-tab:last-child { border-radius: 0 6px 6px 0; }
+        .lang-tab.active { background: #4a90d9; color: #fff; }
+        /* 测试用例 */
+        .tc-section { margin-top: 16px; }
+        .tc-card { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+        .tc-card .tc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .tc-card .tc-header strong { font-size: 14px; }
+        .tc-row { display: flex; gap: 12px; }
+        .tc-row textarea { flex: 1; min-height: 60px; font-family: monospace; font-size: 13px; padding: 8px; border: 1px solid #ddd; border-radius: 4px; resize: vertical; }
+        .gen-section { background: #f0f7ff; border: 1px solid #b8d4f0; border-radius: 8px; padding: 16px; margin-top: 16px; }
+        .gen-section h4 { margin: 0 0 12px 0; color: #2c5282; }
+        .validate-result { margin-top: 12px; padding: 12px; border-radius: 6px; }
+        .validate-result.success { background: #d4edda; color: #155724; }
+        .validate-result.error { background: #f8d7da; color: #721c24; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 500; }
+        .badge-public { background: #d4edda; color: #155724; }
+        .badge-private { background: #f8d7da; color: #721c24; }
+        .summary-card { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+        .summary-card h3 { margin: 0 0 12px 0; }
+        .summary-item { padding: 6px 0; border-bottom: 1px solid #eee; display: flex; }
+        .summary-item:last-child { border: none; }
+        .summary-label { width: 120px; font-weight: 500; color: #666; flex-shrink: 0; }
+        .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid #ccc; border-top-color: #4a90d9; border-radius: 50%; animation: spin 0.6s linear infinite; margin-left: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none; }
+        .type-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+        .type-table th, .type-table td { border: 1px solid #e8ddb5; padding: 5px 10px; text-align: left; }
+        .type-table th { background: #fdf3d7; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-brand"><a href="/problems.html">OJ Platform</a></div>
+        <div class="nav-links">
+            <a href="/problems.html">题目列表</a>
+            <a href="/admin.html">管理面板</a>
+            <a href="/create-problem.html" class="active">出题</a>
+            <a href="#" onclick="logout()">退出</a>
+        </div>
+    </nav>
+
+    <div class="create-container">
+        <h2>创建新题目</h2>
+
+        <div class="steps">
+            <div class="step active" data-step="1"><span class="step-num">1</span>基本信息</div>
+            <div class="step" data-step="2"><span class="step-num">2</span>函数签名</div>
+            <div class="step" data-step="3"><span class="step-num">3</span>代码预览</div>
+            <div class="step" data-step="4"><span class="step-num">4</span>测试用例</div>
+            <div class="step" data-step="5"><span class="step-num">5</span>确认发布</div>
+        </div>
+
+        <!-- ==================== Step 1: 基本信息 ==================== -->
+        <div class="step-panel active" id="step-1">
+            <div class="guide-box">
+                <h4>Step 1 - 填写题目基本信息</h4>
+                填写题目的标题、描述、难度等基本信息。描述需要包含题意说明和输入输出示例，让做题者能理解题目要求。
+                <button class="guide-toggle" onclick="toggleDetail('guide1')">查看示例</button>
+                <div class="guide-detail" id="guide1">
+                    <p><b>标题</b>：简洁明了，通常为算法名称或问题概括</p>
+                    <div class="example-block">两数之和</div>
+                    <p><b>描述</b>：包含题意、约束条件、示例输入输出。建议格式如下：</p>
+                    <div class="example-block">给定一个整数数组 nums 和一个整数目标值 target，请你在该数组中找出和为目标值 target 的那两个整数，并返回它们的数组下标。
+
+你可以假设每种输入只会对应一个答案，并且你不能使用两次相同的元素。
+
+你可以按任意顺序返回答案。
+
+示例 1：
+输入：nums = [2,7,11,15], target = 9
+输出：[0,1]
+
+示例 2：
+输入：nums = [3,2,4], target = 6
+输出：[1,2]
+
+提示：
+- 2 &lt;= nums.length &lt;= 10^4
+- -10^9 &lt;= nums[i] &lt;= 10^9</div>
+                    <p><b>难度</b>：<code>Easy</code> / <code>Medium</code> / <code>Hard</code></p>
+                    <p><b>标签</b>：多个标签用英文逗号分隔，如 <code>数组,哈希表</code>、<code>链表,双指针</code>、<code>动态规划</code></p>
+                    <p><b>时间/内存限制</b>：默认值（5000ms / 256MB）适用于大多数题目。如果题目需要高效算法，可以适当降低。</p>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>题目标题 *</label>
+                    <input type="text" id="prob-title" placeholder="例如：两数之和">
+                </div>
+                <div class="form-group" style="max-width:160px">
+                    <label>难度 *</label>
+                    <select id="prob-difficulty">
+                        <option value="Easy">Easy</option>
+                        <option value="Medium" selected>Medium</option>
+                        <option value="Hard">Hard</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>题目描述 *</label>
+                <textarea id="prob-description" placeholder="请在此填写完整的题目描述，包含题意、约束条件和示例输入输出..."></textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>标签</label>
+                    <input type="text" id="prob-tags" placeholder="多个标签用逗号分隔，例如：数组,哈希表">
+                </div>
+                <div class="form-group" style="max-width:140px">
+                    <label>时间限制(ms)</label>
+                    <input type="number" id="prob-timelimit" value="5000">
+                </div>
+                <div class="form-group" style="max-width:140px">
+                    <label>内存限制(MB)</label>
+                    <input type="number" id="prob-memlimit" value="256">
+                </div>
+            </div>
+            <div class="btn-row">
+                <span></span>
+                <button class="btn btn-primary" onclick="goToStep(2)">下一步</button>
+            </div>
+        </div>
+
+        <!-- ==================== Step 2: 函数签名 ==================== -->
+        <div class="step-panel" id="step-2">
+            <div class="guide-box">
+                <h4>Step 2 - 定义函数签名</h4>
+                函数签名决定了做题者看到的代码模板，以及系统如何读取测试数据、调用用户函数。
+                你只需要定义<b>函数名</b>、<b>参数列表</b>和<b>返回类型</b>，系统会自动生成 Go / C++ / C / Java 四种语言的模板和驱动代码。
+                <button class="guide-toggle" onclick="toggleDetail('guide2')">查看详细说明和支持的类型</button>
+                <div class="guide-detail" id="guide2">
+                    <p><b>函数名</b>：驼峰命名，与 LeetCode 风格一致。例如：<code>twoSum</code>、<code>maxProfit</code>、<code>reverseList</code></p>
+                    <p><b>参数</b>：每个参数需要填写「参数名」和「类型」。系统支持以下类型：</p>
+                    <table class="type-table">
+                        <tr><th>类型</th><th>说明</th><th>测试数据格式（输入/输出各占一行）</th><th>适用场景举例</th></tr>
+                        <tr><td><code>int</code></td><td>整数</td><td><code>42</code></td><td>爬楼梯的 n</td></tr>
+                        <tr><td><code>float</code></td><td>浮点数</td><td><code>3.14</code></td><td>数学计算</td></tr>
+                        <tr><td><code>string</code></td><td>字符串</td><td><code>hello world</code>（整行）</td><td>无重复字符的最长子串</td></tr>
+                        <tr><td><code>bool</code></td><td>布尔值</td><td><code>true</code> 或 <code>false</code></td><td>-</td></tr>
+                        <tr><td><code>[]int</code></td><td>整数数组</td><td><code>2 7 11 15</code>（空格分隔）</td><td>两数之和的 nums</td></tr>
+                        <tr><td><code>[]string</code></td><td>字符串数组</td><td><code>eat tea tan ate</code>（空格分隔）</td><td>字母异位词分组</td></tr>
+                        <tr><td><code>[][]int</code></td><td>二维整数数组</td><td>第一行为行数，之后每行一行数据</td><td>岛屿数量的 grid</td></tr>
+                        <tr><td><code>[]byte</code></td><td>字符数组</td><td><code>abcabc</code>（整行字符串）</td><td>字符频率统计</td></tr>
+                        <tr><td><code>ListNode</code></td><td>链表</td><td><code>1 2 3 4 5</code>（空格分隔节点值）</td><td>反转链表</td></tr>
+                        <tr><td><code>TreeNode</code></td><td>二叉树</td><td><code>1 2 3 null 5</code>（层序遍历，null 表示空）</td><td>二叉树的中序遍历</td></tr>
+                    </table>
+                    <p><b>返回类型</b>：与参数类型相同的选项列表，另外可选 <code>(void)</code> 表示无返回值。</p>
+                    <p style="margin-top:10px"><b>常见题目签名示例：</b></p>
+                    <div class="example-block">// 两数之和
+函数名: twoSum
+参数:   nums []int,  target int
+返回:   []int
+
+// 反转链表
+函数名: reverseList
+参数:   head ListNode
+返回:   ListNode
+
+// 二叉树的最大深度
+函数名: maxDepth
+参数:   root TreeNode
+返回:   int
+
+// 爬楼梯
+函数名: climbStairs
+参数:   n int
+返回:   int
+
+// 字母异位词分组
+函数名: groupAnagrams
+参数:   strs []string
+返回:   [][]string</div>
+                </div>
+            </div>
+
+            <div class="sig-builder">
+                <h4>定义函数签名</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>函数名</label>
+                        <input type="text" id="sig-funcname" placeholder="例如：twoSum">
+                    </div>
+                    <div class="form-group">
+                        <label>返回类型</label>
+                        <select id="sig-returntype">
+                            <option value="int">int</option>
+                            <option value="float">float</option>
+                            <option value="string">string</option>
+                            <option value="bool">bool</option>
+                            <option value="[]int">[]int</option>
+                            <option value="[]string">[]string</option>
+                            <option value="[][]int">[][]int</option>
+                            <option value="[]byte">[]byte</option>
+                            <option value="[][]byte">[][]byte</option>
+                            <option value="ListNode">ListNode</option>
+                            <option value="TreeNode">TreeNode</option>
+                            <option value="">(void)</option>
+                        </select>
+                    </div>
+                </div>
+                <label>参数列表</label>
+                <div class="param-list" id="param-list">
+                    <!-- 动态添加 -->
+                </div>
+                <button class="add-param-btn" onclick="addParam()">+ 添加参数</button>
+            </div>
+
+            <div id="sig-preview" class="code-preview hidden" style="margin-top:16px"></div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="goToStep(1)">上一步</button>
+                <div>
+                    <button class="btn btn-secondary" onclick="previewSignature()" style="margin-right:8px">预览签名</button>
+                    <button class="btn btn-primary" onclick="goToStep(3)">下一步</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== Step 3: 代码预览 ==================== -->
+        <div class="step-panel" id="step-3">
+            <div class="guide-box">
+                <h4>Step 3 - 检查自动生成的代码</h4>
+                系统已根据你的函数签名自动生成了 <b>Go / C++ / C / Java</b> 四种语言的代码。请逐一检查确认无误。
+                <button class="guide-toggle" onclick="toggleDetail('guide3')">了解更多</button>
+                <div class="guide-detail" id="guide3">
+                    <ul>
+                        <li><b>函数模板</b>：做题者在编辑器里看到的代码骨架，只需在函数体内实现逻辑即可。</li>
+                        <li><b>驱动代码</b>：判题时自动拼接在用户代码后面，负责从 stdin 读取测试输入、调用用户函数、将结果输出到 stdout。做题者不可见。</li>
+                        <li>如果生成的代码有问题，可以回到上一步修改函数签名。</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="lang-tabs" id="lang-tabs">
+                <button class="lang-tab active" onclick="switchLang('Go')">Go</button>
+                <button class="lang-tab" onclick="switchLang('C++')">C++</button>
+                <button class="lang-tab" onclick="switchLang('C')">C</button>
+                <button class="lang-tab" onclick="switchLang('Java')">Java</button>
+            </div>
+            <h4>用户看到的函数模板</h4>
+            <div class="code-preview" id="preview-template">请先在第2步定义函数签名并点击"下一步"</div>
+            <h4>驱动代码 (driver code)</h4>
+            <div class="code-preview" id="preview-driver">-</div>
+            <div id="codegen-loading" class="hidden"><span class="loading"></span> 正在生成代码...</div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="goToStep(2)">上一步</button>
+                <button class="btn btn-primary" onclick="goToStep(4)">下一步</button>
+            </div>
+        </div>
+
+        <!-- ==================== Step 4: 测试用例 ==================== -->
+        <div class="step-panel" id="step-4">
+            <div class="guide-box">
+                <h4>Step 4 - 添加测试用例</h4>
+                测试用例用于判定做题者的代码是否正确。有两种方式添加：
+                <ul>
+                    <li><b>手动添加</b>：在下方直接填写输入和期望输出。发布前至少添加 2~3 个公开用例（做题者可见）。</li>
+                    <li><b>自动生成</b>：粘贴标程代码（标准答案），系统自动随机生成输入、运行标程得到输出，批量创建测试用例。如果题目尚未发布，系统会自动先发布题目。</li>
+                </ul>
+                <button class="guide-toggle" onclick="toggleDetail('guide4')">查看测试数据格式说明和示例</button>
+                <div class="guide-detail" id="guide4">
+                    <p>测试数据的<b>输入</b>和<b>输出</b>都是纯文本，每个参数占一行，格式与第2步中选择的类型对应：</p>
+                    <p><b>示例 - 两数之和</b>（参数：<code>nums []int</code>, <code>target int</code>；返回：<code>[]int</code>）</p>
+                    <div class="example-block">输入（两行，第一行是 nums，第二行是 target）：
+2 7 11 15
+9
+
+期望输出（一行，返回的两个下标）：
+0 1</div>
+                    <p><b>示例 - 反转链表</b>（参数：<code>head ListNode</code>；返回：<code>ListNode</code>）</p>
+                    <div class="example-block">输入（链表节点值，空格分隔）：
+1 2 3 4 5
+
+期望输出（反转后的链表）：
+5 4 3 2 1</div>
+                    <p><b>示例 - 二叉树最大深度</b>（参数：<code>root TreeNode</code>；返回：<code>int</code>）</p>
+                    <div class="example-block">输入（层序遍历，null 表示空节点）：
+3 9 20 null null 15 7
+
+期望输出：
+3</div>
+                    <p><b>示例 - 岛屿数量</b>（参数：<code>grid [][]byte</code>；返回：<code>int</code>）</p>
+                    <div class="example-block">输入（第一行是行数，之后每行是 grid 的一行）：
+4
+11110
+11010
+11000
+00000
+
+期望输出：
+1</div>
+                    <p style="margin-top:10px"><b>自动生成说明</b>：</p>
+                    <ul>
+                        <li>粘贴你的 Go 标准答案（只写函数体，不需要 main 函数和 import），点击「自动生成」即可。</li>
+                        <li>如果题目尚未发布，系统会自动先发布题目再生成测试数据，无需手动操作。</li>
+                        <li><b>生成数量</b>：建议 50 个。系统会随机生成输入数据，运行标程获得正确输出。</li>
+                        <li><b>公开数量</b>：前 N 个用例会标记为「公开」，做题者可以在题目页面看到。建议 2~3 个。</li>
+                        <li>生成后可点击「验证测试用例」确认标程在所有用例上全部通过。</li>
+                    </ul>
+                    <p><b>标程代码示例</b>（两数之和）：</p>
+                    <div class="example-block">func twoSum(nums []int, target int) []int {
+    hashMap := make(map[int]int)
+    for i, v := range nums {
+        if j, ok := hashMap[v]; ok {
+            return []int{j, i}
+        }
+        hashMap[target-v] = i
+    }
+    return nil
+}</div>
+                </div>
+            </div>
+
+            <!-- 手动添加区 -->
+            <div class="tc-section">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <h4>手动添加测试用例</h4>
+                    <button class="btn btn-sm btn-primary" onclick="addTestCaseUI()">+ 添加</button>
+                </div>
+                <div id="tc-list">
+                    <!-- 动态 -->
+                </div>
+            </div>
+
+            <!-- 自动生成区 -->
+            <div class="gen-section">
+                <h4>自动生成测试用例</h4>
+                <div class="form-group">
+                    <label>标程代码（Go，只写函数实现，不需要 main 和 import）</label>
+                    <textarea id="ref-code" class="code-area" placeholder="func twoSum(nums []int, target int) []int {&#10;    // 粘贴你的标准答案...&#10;}"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="max-width:120px">
+                        <label>生成数量</label>
+                        <input type="number" id="gen-count" value="50">
+                    </div>
+                    <div class="form-group" style="max-width:120px">
+                        <label>公开数量</label>
+                        <input type="number" id="gen-public" value="3">
+                    </div>
+                </div>
+                <button class="btn btn-success" id="btn-generate" onclick="generateTestCases()">自动生成</button>
+                <button class="btn btn-secondary" id="btn-validate" onclick="validateTestCases()" style="margin-left:8px">验证测试用例</button>
+                <div id="gen-result" class="hidden"></div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="goToStep(3)">上一步</button>
+                <button class="btn btn-primary" onclick="goToStep(5)">下一步</button>
+            </div>
+        </div>
+
+        <!-- ==================== Step 5: 确认发布 ==================== -->
+        <div class="step-panel" id="step-5">
+            <div class="guide-box">
+                <h4>Step 5 - 确认并发布</h4>
+                检查以下信息是否正确，然后点击「发布题目」。
+                <br>如果你已经在第4步使用了「自动生成」，题目会自动发布，此处无需重复操作。
+            </div>
+
+            <div class="summary-card">
+                <div class="summary-item"><span class="summary-label">标题</span><span id="sum-title"></span></div>
+                <div class="summary-item"><span class="summary-label">难度</span><span id="sum-difficulty"></span></div>
+                <div class="summary-item"><span class="summary-label">标签</span><span id="sum-tags"></span></div>
+                <div class="summary-item"><span class="summary-label">时间限制</span><span id="sum-timelimit"></span></div>
+                <div class="summary-item"><span class="summary-label">内存限制</span><span id="sum-memlimit"></span></div>
+                <div class="summary-item"><span class="summary-label">函数名</span><span id="sum-funcname"></span></div>
+                <div class="summary-item"><span class="summary-label">测试用例</span><span id="sum-tc-count"></span></div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="goToStep(4)">上一步</button>
+                <button class="btn btn-success" id="btn-publish" onclick="publishProblem()">发布题目</button>
+            </div>
+            <div id="publish-result" class="hidden" style="margin-top:12px"></div>
+        </div>
+    </div>
+
+    <script src="/js/api.js"></script>
+    <script>
+    // ========== 指南折叠 ==========
+    function toggleDetail(id) {
+        const el = document.getElementById(id);
+        el.classList.toggle('show');
+    }
+
+    // ========== 全局状态 ==========
+    let currentStep = 1;
+    let generatedCodes = null;
+    let currentLang = 'Go';
+    let manualTestCases = [];
+    let createdProblemId = null;
+
+    // ========== 步骤导航 ==========
+    function goToStep(n) {
+        if (n > currentStep) {
+            if (currentStep === 1 && !validateStep1()) return;
+            if (currentStep === 2 && !validateStep2()) return;
+            if (n >= 3 && !generatedCodes) {
+                generateCodePreview();
+            }
+            if (n === 5) fillSummary();
+        }
+
+        document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.step').forEach(s => {
+            s.classList.remove('active');
+            if (parseInt(s.dataset.step) < n) s.classList.add('completed');
+            else s.classList.remove('completed');
+        });
+        document.getElementById('step-' + n).classList.add('active');
+        document.querySelector(`.step[data-step="${n}"]`).classList.add('active');
+        currentStep = n;
+    }
+
+    document.querySelectorAll('.step').forEach(s => {
+        s.addEventListener('click', () => goToStep(parseInt(s.dataset.step)));
+    });
+
+    // ========== Step 1 校验 ==========
+    function validateStep1() {
+        const title = document.getElementById('prob-title').value.trim();
+        const desc = document.getElementById('prob-description').value.trim();
+        if (!title) { alert('请填写题目标题'); return false; }
+        if (!desc) { alert('请填写题目描述'); return false; }
+        return true;
+    }
+
+    // ========== Step 2: 函数签名 ==========
+    function validateStep2() {
+        const name = document.getElementById('sig-funcname').value.trim();
+        if (!name) { alert('请填写函数名'); return false; }
+        return true;
+    }
+
+    function addParam(name, type) {
+        const list = document.getElementById('param-list');
+        const div = document.createElement('div');
+        div.className = 'param-item';
+        div.innerHTML = `
+            <input class="param-name" type="text" placeholder="参数名" value="${name || ''}">
+            <select class="param-type">
+                <option value="int" ${type==='int'?'selected':''}>int</option>
+                <option value="float" ${type==='float'?'selected':''}>float</option>
+                <option value="string" ${type==='string'?'selected':''}>string</option>
+                <option value="bool" ${type==='bool'?'selected':''}>bool</option>
+                <option value="[]int" ${type==='[]int'?'selected':''}>[]int</option>
+                <option value="[]string" ${type==='[]string'?'selected':''}>[]string</option>
+                <option value="[][]int" ${type==='[][]int'?'selected':''}>[][]int</option>
+                <option value="[]byte" ${type==='[]byte'?'selected':''}>[]byte</option>
+                <option value="[][]byte" ${type==='[][]byte'?'selected':''}>[][]byte</option>
+                <option value="ListNode" ${type==='ListNode'?'selected':''}>ListNode</option>
+                <option value="TreeNode" ${type==='TreeNode'?'selected':''}>TreeNode</option>
+            </select>
+            <button class="remove-param" onclick="this.parentElement.remove()">&times;</button>
+        `;
+        list.appendChild(div);
+    }
+
+    // 默认加两个参数作为示例
+    addParam('nums', '[]int');
+    addParam('target', 'int');
+
+    function getSignature() {
+        const name = document.getElementById('sig-funcname').value.trim();
+        const returnType = document.getElementById('sig-returntype').value;
+        const params = [];
+        document.querySelectorAll('.param-item').forEach(item => {
+            const pName = item.querySelector('.param-name').value.trim();
+            const pType = item.querySelector('.param-type').value;
+            if (pName) params.push({ name: pName, type: pType });
+        });
+        return { name, params, return_type: returnType };
+    }
+
+    function previewSignature() {
+        const sig = getSignature();
+        if (!sig.name) { alert('请填写函数名'); return; }
+        const params = sig.params.map(p => p.name + ' ' + p.type).join(', ');
+        const ret = sig.return_type ? ' ' + sig.return_type : '';
+        const preview = `func ${sig.name}(${params})${ret} {\n    // 请在此实现你的代码\n}`;
+        const el = document.getElementById('sig-preview');
+        el.textContent = preview;
+        el.classList.remove('hidden');
+    }
+
+    // ========== Step 3: 代码预览 ==========
+    async function generateCodePreview() {
+        const sig = getSignature();
+        if (!sig.name) return;
+
+        const loadingEl = document.getElementById('codegen-loading');
+        loadingEl.classList.remove('hidden');
+
+        try {
+            const resp = await API.request('/admin/codegen/preview', {
+                method: 'POST',
+                body: JSON.stringify({ function_signature: sig }),
+            });
+            generatedCodes = resp.data;
+            switchLang(currentLang);
+        } catch (e) {
+            document.getElementById('preview-template').textContent = '生成失败: ' + e.message;
+        } finally {
+            loadingEl.classList.add('hidden');
+        }
+    }
+
+    function switchLang(lang) {
+        currentLang = lang;
+        document.querySelectorAll('.lang-tab').forEach(t => {
+            t.classList.toggle('active', t.textContent === lang);
+        });
+        if (generatedCodes && generatedCodes[lang]) {
+            document.getElementById('preview-template').textContent = generatedCodes[lang].function_template;
+            document.getElementById('preview-driver').textContent = generatedCodes[lang].driver_code;
+        } else {
+            document.getElementById('preview-template').textContent = '该语言暂无模板';
+            document.getElementById('preview-driver').textContent = '-';
+        }
+    }
+
+    // ========== Step 4: 测试用例 ==========
+    let tcCounter = 0;
+    function addTestCaseUI(input, output, isPublic) {
+        tcCounter++;
+        const list = document.getElementById('tc-list');
+        const card = document.createElement('div');
+        card.className = 'tc-card';
+        card.id = 'tc-' + tcCounter;
+        const idx = tcCounter;
+        card.innerHTML = `
+            <div class="tc-header">
+                <strong>测试用例 #${idx} <span class="badge ${isPublic ? 'badge-public' : 'badge-private'}">${isPublic ? '公开' : '私有'}</span></strong>
+                <div>
+                    <label style="font-size:13px;margin-right:8px"><input type="checkbox" class="tc-public" ${isPublic ? 'checked' : ''}> 公开</label>
+                    <button class="btn btn-sm btn-danger" onclick="removeTestCase(${idx})">删除</button>
+                </div>
+            </div>
+            <div class="tc-row">
+                <textarea class="tc-input" placeholder="输入（每个参数一行）">${input || ''}</textarea>
+                <textarea class="tc-output" placeholder="期望输出">${output || ''}</textarea>
+            </div>
+        `;
+        list.appendChild(card);
+    }
+
+    function removeTestCase(idx) {
+        const el = document.getElementById('tc-' + idx);
+        if (el) el.remove();
+    }
+
+    function collectManualTestCases() {
+        const tcs = [];
+        document.querySelectorAll('.tc-card').forEach(card => {
+            const input = card.querySelector('.tc-input').value;
+            const output = card.querySelector('.tc-output').value;
+            const isPublic = card.querySelector('.tc-public').checked;
+            if (input && output) {
+                tcs.push({ input, output, is_public: isPublic });
+            }
+        });
+        return tcs;
+    }
+
+    async function generateTestCases() {
+        // 如果题目还没发布，先自动发布
+        if (!createdProblemId) {
+            if (!validateStep1() || !validateStep2()) return;
+            const ok = await autoPublishProblem();
+            if (!ok) return;
+        }
+        const refCode = document.getElementById('ref-code').value.trim();
+        if (!refCode) { alert('请粘贴标程代码'); return; }
+
+        const count = parseInt(document.getElementById('gen-count').value) || 50;
+        const publicCount = parseInt(document.getElementById('gen-public').value) || 3;
+
+        const resultEl = document.getElementById('gen-result');
+        resultEl.className = 'validate-result';
+        resultEl.textContent = '正在生成...';
+        resultEl.classList.remove('hidden');
+
+        try {
+            const resp = await API.request(`/admin/problems/${createdProblemId}/generate-testcases`, {
+                method: 'POST',
+                body: JSON.stringify({
+                    reference_code: refCode,
+                    language: 'Go',
+                    count: count,
+                    public_count: publicCount,
+                }),
+            });
+            resultEl.className = 'validate-result success';
+            resultEl.textContent = `成功生成 ${resp.data.generated} 个测试用例（${resp.data.failed} 个失败）`;
+        } catch (e) {
+            resultEl.className = 'validate-result error';
+            resultEl.textContent = '生成失败: ' + e.message;
+        }
+    }
+
+    async function validateTestCases() {
+        if (!createdProblemId) {
+            if (!validateStep1() || !validateStep2()) return;
+            const ok = await autoPublishProblem();
+            if (!ok) return;
+        }
+        const refCode = document.getElementById('ref-code').value.trim();
+        if (!refCode) { alert('请粘贴标程代码'); return; }
+
+        const resultEl = document.getElementById('gen-result');
+        resultEl.className = 'validate-result';
+        resultEl.textContent = '正在验证...';
+        resultEl.classList.remove('hidden');
+
+        try {
+            const resp = await API.request(`/admin/problems/${createdProblemId}/validate-testcases`, {
+                method: 'POST',
+                body: JSON.stringify({ reference_code: refCode, language: 'Go' }),
+            });
+            const d = resp.data;
+            if (d.failed === 0) {
+                resultEl.className = 'validate-result success';
+                resultEl.textContent = `全部通过！${d.passed}/${d.total} 个测试用例验证成功`;
+            } else {
+                resultEl.className = 'validate-result error';
+                resultEl.innerHTML = `${d.passed}/${d.total} 通过，${d.failed} 个失败<br>` +
+                    d.failures.slice(0, 5).map(f =>
+                        `  #${f.test_case_id}: 状态=${f.status}, 期望="${f.expected}", 实际="${f.actual}"`
+                    ).join('<br>');
+            }
+        } catch (e) {
+            resultEl.className = 'validate-result error';
+            resultEl.textContent = '验证失败: ' + e.message;
+        }
+    }
+
+    // ========== 自动发布题目（供自动生成/验证调用） ==========
+    async function autoPublishProblem() {
+        const resultEl = document.getElementById('gen-result');
+        resultEl.className = 'validate-result';
+        resultEl.textContent = '题目尚未发布，正在自动发布...';
+        resultEl.classList.remove('hidden');
+
+        try {
+            const sig = getSignature();
+            const body = {
+                title: document.getElementById('prob-title').value.trim(),
+                description: document.getElementById('prob-description').value.trim(),
+                difficulty: document.getElementById('prob-difficulty').value,
+                tags: document.getElementById('prob-tags').value.trim(),
+                time_limit: parseInt(document.getElementById('prob-timelimit').value) || 5000,
+                memory_limit: parseInt(document.getElementById('prob-memlimit').value) || 256,
+            };
+            if (sig.name) body.function_signature = sig;
+
+            const resp = await API.request('/admin/problems', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+            createdProblemId = resp.data.id;
+
+            // 同时提交手动测试用例
+            const tcs = collectManualTestCases();
+            for (const tc of tcs) {
+                try {
+                    await API.request(`/admin/problems/${createdProblemId}/testcases`, {
+                        method: 'POST',
+                        body: JSON.stringify(tc),
+                    });
+                } catch (e) { /* 继续 */ }
+            }
+
+            resultEl.className = 'validate-result success';
+            resultEl.textContent = `题目已自动发布（ID: ${createdProblemId}），继续执行...`;
+            return true;
+        } catch (e) {
+            resultEl.className = 'validate-result error';
+            resultEl.textContent = '自动发布失败: ' + e.message;
+            return false;
+        }
+    }
+
+    // ========== Step 5: 确认发布 ==========
+    function fillSummary() {
+        document.getElementById('sum-title').textContent = document.getElementById('prob-title').value;
+        document.getElementById('sum-difficulty').textContent = document.getElementById('prob-difficulty').value;
+        document.getElementById('sum-tags').textContent = document.getElementById('prob-tags').value || '(无)';
+        document.getElementById('sum-timelimit').textContent = document.getElementById('prob-timelimit').value + ' ms';
+        document.getElementById('sum-memlimit').textContent = document.getElementById('prob-memlimit').value + ' MB';
+        document.getElementById('sum-funcname').textContent = document.getElementById('sig-funcname').value;
+        const tcs = collectManualTestCases();
+        document.getElementById('sum-tc-count').textContent = tcs.length + ' 个（手动添加）' + (createdProblemId ? ' + 已自动生成' : '');
+    }
+
+    async function publishProblem() {
+        if (createdProblemId) {
+            // 已经发布过了
+            const resultEl = document.getElementById('publish-result');
+            resultEl.className = 'validate-result success';
+            resultEl.innerHTML = `题目已发布（ID: ${createdProblemId}）。<a href="/problem.html?id=${createdProblemId}" target="_blank">查看题目</a>`;
+            resultEl.classList.remove('hidden');
+            return;
+        }
+
+        const btn = document.getElementById('btn-publish');
+        btn.disabled = true;
+        btn.textContent = '发布中...';
+
+        const resultEl = document.getElementById('publish-result');
+
+        try {
+            const sig = getSignature();
+            const body = {
+                title: document.getElementById('prob-title').value.trim(),
+                description: document.getElementById('prob-description').value.trim(),
+                difficulty: document.getElementById('prob-difficulty').value,
+                tags: document.getElementById('prob-tags').value.trim(),
+                time_limit: parseInt(document.getElementById('prob-timelimit').value) || 5000,
+                memory_limit: parseInt(document.getElementById('prob-memlimit').value) || 256,
+            };
+            if (sig.name) {
+                body.function_signature = sig;
+            }
+
+            const resp = await API.request('/admin/problems', {
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+            createdProblemId = resp.data.id;
+
+            const tcs = collectManualTestCases();
+            let tcAdded = 0;
+            for (const tc of tcs) {
+                try {
+                    await API.request(`/admin/problems/${createdProblemId}/testcases`, {
+                        method: 'POST',
+                        body: JSON.stringify(tc),
+                    });
+                    tcAdded++;
+                } catch (e) { /* 继续 */ }
+            }
+
+            resultEl.className = 'validate-result success';
+            resultEl.innerHTML = `题目创建成功！ID: ${createdProblemId}，已添加 ${tcAdded} 个手动测试用例。<br><br>` +
+                `<b>下一步</b>：回到第 4 步，粘贴标程代码，点击「自动生成」批量创建测试用例。<br>` +
+                `<a href="/problem.html?id=${createdProblemId}" target="_blank">在新窗口查看题目</a>`;
+            resultEl.classList.remove('hidden');
+
+        } catch (e) {
+            resultEl.className = 'validate-result error';
+            resultEl.textContent = '发布失败: ' + e.message;
+            resultEl.classList.remove('hidden');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = '发布题目';
+        }
+    }
+
+    // ========== 初始化 ==========
+    checkAuth();
+    </script>
+</body>
+</html>

@@ -17,19 +17,22 @@ type User struct {
 }
 
 type Problem struct {
-	ID               uint           `gorm:"primaryKey" json:"id"`
-	Title            string         `gorm:"size:200;not null" json:"title"`
-	Description      string         `gorm:"type:text;not null" json:"description"`
-	Difficulty       string         `gorm:"size:20;not null" json:"difficulty"` // Easy, Medium, Hard
-	Tags             string         `gorm:"size:255" json:"tags"`               // JSON array
-	TimeLimit        int            `gorm:"not null;default:5000" json:"time_limit"`   // 毫秒
-	MemoryLimit      int            `gorm:"not null;default:256" json:"memory_limit"`  // MB
-	FunctionTemplate string         `gorm:"type:text" json:"function_template"` // 展示给用户的函数签名模板
-	DriverCode       string         `gorm:"type:text" json:"-"`                 // 拼接在用户代码后的驱动代码（含main函数）
-	CreatedAt        time.Time      `json:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at"`
-	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`
-	TestCases        []TestCase     `gorm:"foreignKey:ProblemID" json:"-"`
+	ID                uint           `gorm:"primaryKey" json:"id"`
+	Title             string         `gorm:"size:200;not null" json:"title"`
+	Description       string         `gorm:"type:text;not null" json:"description"`
+	Difficulty        string         `gorm:"size:20;not null" json:"difficulty"` // Easy, Medium, Hard
+	Tags              string         `gorm:"size:255" json:"tags"`               // JSON array
+	TimeLimit         int            `gorm:"not null;default:5000" json:"time_limit"`   // 毫秒
+	MemoryLimit       int            `gorm:"not null;default:256" json:"memory_limit"`  // MB
+	FunctionSignature string         `gorm:"type:text" json:"function_signature,omitempty"` // 结构化函数签名 JSON
+	FunctionTemplate  string         `gorm:"type:text" json:"function_template"` // 展示给用户的函数签名模板（Go）
+	DriverCode        string         `gorm:"type:text" json:"-"`                 // 拼接在用户代码后的驱动代码（Go）
+	TemplatesJSON     string         `gorm:"type:text" json:"-"`                 // 多语言模板 JSON {"C++": {"function_template":"...", "driver_code":"..."}, ...}
+	Status            string         `gorm:"size:20;default:active" json:"status"` // active, inactive
+	CreatedAt         time.Time      `json:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at"`
+	DeletedAt         gorm.DeletedAt `gorm:"index" json:"-"`
+	TestCases         []TestCase     `gorm:"foreignKey:ProblemID" json:"-"`
 }
 
 type TestCase struct {

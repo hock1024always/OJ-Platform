@@ -1,0 +1,37 @@
+# OJ Platform 配置文件
+# 复制此文件为 config.yaml 并按需修改
+
+server:
+  port: 8080
+  mode: release  # debug, release, test
+
+database:
+  host: sqlite
+  port: 5432
+  user: oj_user
+  password: oj_password
+  dbname: oj_platform
+  sslmode: disable
+
+judge:
+  worker_count: 20
+  time_limit: 5000        # 毫秒
+  memory_limit: 256       # MB
+  output_limit: 16        # MB
+  go_path: /usr/local/go/bin/go
+  gcc_path: /usr/bin/gcc
+  gpp_path: /usr/bin/g++
+  javac_path: /usr/bin/javac
+  java_path: /usr/bin/java
+
+queue:
+  max_size: 1000
+  worker_timeout: 30      # 秒
+
+jwt:
+  secret: your-secret-key-change-in-production
+  expire: 24              # 小时
+
+log:
+  level: info
+  format: console         # console, json
